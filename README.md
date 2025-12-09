@@ -4,21 +4,21 @@ A web-based application that records Vietnamese audio and automatically generate
 
 ## Features
 
-- 🎤 **Audio Recording**: Browser-based audio recording with real-time visualization
-- 🇻🇳 **Vietnamese Support**: Optimized for Vietnamese language transcription
-- 🤖 **AI-Powered**: Uses Gemini 2.5 Flash for accurate transcription and analysis
-- 📊 **80/20 Filtering**: Applies Pareto Principle to extract key information (80% signal, filter 20% noise)
-- ⏱️ **Long Recording Support**: Handles meetings up to 2 hours
-- 📝 **Smart Minutes**: Automatically generates structured meeting minutes with:
+- **Audio Recording**: Browser-based audio recording with real-time visualization
+- **Vietnamese Support**: Optimized for Vietnamese language transcription
+- **AI-Powered**: Uses Gemini 2.5 Flash for accurate transcription and analysis
+- **80/20 Filtering**: Applies Pareto Principle to extract key information (80% signal, filter 20% noise)
+- **Long Recording Support**: Handles meetings up to 2 hours
+- **Smart Minutes**: Automatically generates structured meeting minutes with:
   - Key discussion points
   - Decisions made
   - Action items
   - Summary
-- 💾 **Export Options**: Download or copy meeting minutes
-- 🎨 **Modern UI**: Beautiful, responsive interface with dark theme
-- 📱 **Mobile Friendly**: Fully responsive design for mobile devices
-- 🎧 **Audio Preview**: Listen to your recording before processing
-- 💡 **Session Persistence**: Auto-saves last meeting (24h)
+- **Export Options**: Download or copy meeting minutes
+- **Modern UI**: Beautiful, responsive interface with dark theme
+- **Mobile Friendly**: Fully responsive design for mobile devices
+- **Audio Preview**: Listen to your recording before processing
+- **Session Persistence**: Auto-saves last meeting (24h)
 
 ## Setup Instructions
 

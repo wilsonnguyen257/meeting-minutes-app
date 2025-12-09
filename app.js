@@ -78,7 +78,7 @@ class MeetingRecorder {
             // Update UI
             this.startBtn.disabled = true;
             this.stopBtn.disabled = false;
-            this.recordingStatus.textContent = '🔴 Đang ghi âm...';
+            this.recordingStatus.textContent = 'Đang ghi âm...';
             this.recordingStatus.classList.add('recording');
 
             // Start timer
@@ -125,10 +125,10 @@ class MeetingRecorder {
         // Add audio player to UI
         const previewHtml = `
             <div class="audio-preview">
-                <p>🎧 Nghe lại bản ghi:</p>
+                <p>Nghe lại bản ghi:</p>
                 <audio controls src="${audioUrl}"></audio>
                 <button id="downloadAudioBtn" class="btn btn-secondary">
-                    <span class="icon">💾</span> Tải xuống file ghi âm
+                    Tải xuống file ghi âm
                 </button>
             </div>
         `;
@@ -210,7 +210,7 @@ class MeetingRecorder {
         const elapsedMs = Date.now() - this.startTime;
         if (elapsedMs > 110 * 60 * 1000 && !this.warningShown) {
             this.warningShown = true;
-            this.recordingStatus.textContent = '⚠️ Gần hết thời gian ghi âm! (còn 10 phút)';
+            this.recordingStatus.textContent = 'Cảnh báo: Gần hết thời gian ghi âm! (còn 10 phút)';
             this.recordingStatus.style.color = '#ff9800';
         }
         
@@ -289,9 +289,9 @@ class MeetingRecorder {
             // Show error with download option
             this.transcriptContent.innerHTML = `
                 <p class="error">${errorMsg}</p>
-                <p class="error-help">💡 Bạn có thể tải xuống file ghi âm gốc và thử lại sau.</p>
+                <p class="error-help">Bạn có thể tải xuống file ghi âm gốc và thử lại sau.</p>
                 <button id="downloadAudioOnError" class="btn btn-secondary" style="margin: 20px auto; display: block;">
-                    <span class="icon">💾</span> Tải xuống file ghi âm
+                    Tải xuống file ghi âm
                 </button>
             `;
             this.minutesContent.innerHTML = '<p class="error">Không thể tạo biên bản cuộc họp.</p>';
