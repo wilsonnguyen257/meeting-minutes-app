@@ -191,9 +191,10 @@ async function transcribeAudio(audioBase64, mimeType) {
         console.log(`Audio size estimate: ${sizeInMB.toFixed(2)} MB`);
         
         const prompt = `Transcribe this Vietnamese audio recording accurately. 
-Please provide the complete transcription of what was said in the meeting.
+Provide ONLY what was actually said - do not make up or infer any content.
+If the recording is very short or contains no meaningful speech, just transcribe exactly what you hear.
 Format the output as plain text with proper punctuation and paragraph breaks.
-If this is a long recording, provide a comprehensive transcription of all spoken content.`;
+IMPORTANT: If there is little to no speech content, respond with "[Không có nội dung cuộc họp - No meeting content detected]"`;
 
         const result = await model.generateContent([
             {
@@ -229,7 +230,13 @@ async function generateMeetingMinutes(transcript) {
             }
         });
         
-        const prompt = `You are an expert meeting minutes generator. Analyze the following Vietnamese meeting transcript and create comprehensive meeting minutes.
+        const prompt = `You are an expert meeting minutes generator. Analyze the following Vietnamese meeting transcript and create meeting minutes.
+
+IMPORTANT RULES:
+1. ONLY extract information that is ACTUALLY PRESENT in the transcript
+2. DO NOT make up, infer, or hallucinate any content
+3. If the transcript is too short or lacks meaningful content, indicate this clearly
+4. If transcript says "[Không có nội dung cuộc họp]", return a minimal response indicating no content
 
 Apply the 80/20 principle (Pareto Principle) to filter signal from noise:
 - 80% SIGNAL: Focus on the critical 20% of content that delivers 80% of the value:
@@ -264,10 +271,19 @@ Format your response as a JSON object with this structure:
   "actionItems": ["action 1", "action 2", ...]
 }
 
+For short recordings or test recordings with no real content, use:
+{
+  "title": "Ghi Âm Thử Nghiệm",
+  "summary": "Đây là bản ghi âm thử nghiệm hoặc quá ngắn để tạo biên bản cuộc họp.",
+  "keyPoints": [],
+  "decisions": [],
+  "actionItems": []
+}
+
 Transcript:
 ${transcript}
 
-Provide ONLY the JSON object, no additional text.`;
+Provide ONLY the JSON object, no additional text. Do NOT fabricate content.`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;

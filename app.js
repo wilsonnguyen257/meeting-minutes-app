@@ -227,6 +227,15 @@ class MeetingRecorder {
         // Validate file size (25MB limit)
         const fileSizeInMB = audioBlob.size / (1024 * 1024);
         
+        // Warning for very short recordings (< 5 seconds estimated)
+        const recordingDuration = (Date.now() - this.startTime) / 1000;
+        if (recordingDuration < 5) {
+            const proceed = confirm(`Ghi âm rất ngắn (${recordingDuration.toFixed(0)} giây). AI có thể không tạo được nội dung hữu ích hoặc tạo nội dung không chính xác. Bạn có muốn tiếp tục?`);
+            if (!proceed) {
+                return;
+            }
+        }
+        
         // Warning for very large files
         if (fileSizeInMB > 20) {
             const proceed = confirm(`File âm thanh rất lớn (${fileSizeInMB.toFixed(2)} MB). Quá trình xử lý có thể mất nhiều thời gian (5-10 phút). Bạn có muốn tiếp tục?`);
