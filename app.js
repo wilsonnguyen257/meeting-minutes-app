@@ -10,6 +10,7 @@ class MeetingRecorder {
         this.visualizerAnimation = null;
         this.maxRecordingTime = 120 * 60 * 1000; // 2 hours max (increased from 30 min)
         this.warningShown = false;
+        this.lastRecordingBlob = null; // Store the last recording
 
         this.initializeElements();
         this.attachEventListeners();
@@ -116,9 +117,9 @@ class MeetingRecorder {
             this.createAudioPreview();
         }
     }
-    
     createAudioPreview() {
         const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        this.lastRecordingBlob = audioBlob; // Save for potential download
         const audioUrl = URL.createObjectURL(audioBlob);
         
         // Add audio player to UI
@@ -126,6 +127,9 @@ class MeetingRecorder {
             <div class="audio-preview">
                 <p>🎧 Nghe lại bản ghi:</p>
                 <audio controls src="${audioUrl}"></audio>
+                <button id="downloadAudioBtn" class="btn btn-secondary">
+                    <span class="icon">💾</span> Tải xuống file ghi âm
+                </button>
             </div>
         `;
         
@@ -137,6 +141,24 @@ class MeetingRecorder {
         
         const resultsSection = document.querySelector('.results-section');
         resultsSection.insertAdjacentHTML('beforebegin', previewHtml);
+        
+        // Add download listener
+        document.getElementById('downloadAudioBtn').addEventListener('click', () => this.downloadAudio());
+    }
+    
+    downloadAudio() {
+        if (!this.lastRecordingBlob) {
+            alert('Không có file ghi âm để tải xuống');
+            return;
+        }
+        
+        const url = URL.createObjectURL(this.lastRecordingBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ghi-am-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }   resultsSection.insertAdjacentHTML('beforebegin', previewHtml);
     }
 
     setupVisualizer(stream) {
@@ -250,23 +272,36 @@ class MeetingRecorder {
             
             // Show metadata if available
             if (result.metadata) {
-                const metaInfo = `<div class="meta-info">⏱️ Thời gian xử lý: ${result.metadata.processingTime} | 📁 Kích thước: ${result.metadata.fileSize}</div>`;
-                this.minutesContent.innerHTML += metaInfo;
-            }
-
-            // Show action buttons
-            document.querySelector('.actions').style.display = 'flex';
-            
-            // Save to localStorage for session persistence
-            this.saveToLocalStorage(result);
-
         } catch (error) {
-            // Display results
+            console.error('Error processing audio:', error);
             this.hideLoading('transcript');
-            this.transcriptContent.innerHTML = `<div class="transcript-text">${this.formatTranscript(result.transcript)}</div>`;
-
             this.hideLoading('minutes');
-            this.minutesContent.innerHTML = this.formatMinutes(result.minutes);
+            
+            let errorMsg = 'Đã xảy ra lỗi khi xử lý ghi âm. Vui lòng thử lại.';
+            if (error.message && error.message.includes('quota')) {
+                errorMsg = 'Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút.';
+            } else if (error.message && error.message.includes('timeout')) {
+                errorMsg = 'Quá trình xử lý mất quá nhiều thời gian. Vui lòng ghi âm ngắn hơn.';
+            } else if (error.message && error.message.includes('429')) {
+                errorMsg = 'Quá nhiều yêu cầu. Vui lòng đợi 1 phút rồi thử lại.';
+            }
+            
+            // Show error with download option
+            this.transcriptContent.innerHTML = `
+                <p class="error">${errorMsg}</p>
+                <p class="error-help">💡 Bạn có thể tải xuống file ghi âm gốc và thử lại sau.</p>
+                <button id="downloadAudioOnError" class="btn btn-secondary" style="margin: 20px auto; display: block;">
+                    <span class="icon">💾</span> Tải xuống file ghi âm
+                </button>
+            `;
+            this.minutesContent.innerHTML = '<p class="error">Không thể tạo biên bản cuộc họp.</p>';
+            
+            // Add download listener for error case
+            const downloadBtn = document.getElementById('downloadAudioOnError');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', () => this.downloadAudio());
+            }
+        }   this.minutesContent.innerHTML = this.formatMinutes(result.minutes);
 
             // Show action buttons
             document.querySelector('.actions').style.display = 'flex';

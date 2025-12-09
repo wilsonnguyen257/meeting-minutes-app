@@ -454,6 +454,18 @@ footer {
     max-width: 500px;
     border-radius: 25px;
     background: var(--dark-bg);
+    margin-bottom: 15px;
+}
+
+.audio-preview .btn {
+    margin-top: 10px;
+}
+
+/* Error Help Text */
+.error-help {
+    color: var(--text-gray) !important;
+    font-style: italic;
+    margin-top: 10px;
 }
 
 /* Metadata Info */
