@@ -104,7 +104,8 @@ class MeetingRecorder {
             // Update UI
             this.startBtn.disabled = false;
             this.stopBtn.disabled = true;
-            this.recordingStatus.textContent = 'Đã dừng ghi âm';
+            const duration = Math.floor((Date.now() - this.startTime) / 1000);
+            this.recordingStatus.textContent = `Đã ghi âm ${duration} giây`;
             this.recordingStatus.classList.remove('recording');
         }
     }
@@ -158,6 +159,16 @@ class MeetingRecorder {
     async processRecording() {
         const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
         
+        // Validate file size (25MB limit)
+        const fileSizeInMB = audioBlob.size / (1024 * 1024);
+        if (fileSizeInMB > 25) {
+            this.hideLoading('transcript');
+            this.hideLoading('minutes');
+            this.transcriptContent.innerHTML = '<p class="error">File âm thanh quá lớn (> 25MB). Vui lòng ghi âm ngắn hơn.</p>';
+            this.minutesContent.innerHTML = '<p class="error">Không thể xử lý file.</p>';
+            return;
+        }
+        
         // Show loading states
         this.showLoading('transcript');
         this.showLoading('minutes');
@@ -192,7 +203,17 @@ class MeetingRecorder {
             console.error('Error processing audio:', error);
             this.hideLoading('transcript');
             this.hideLoading('minutes');
-            this.transcriptContent.innerHTML = '<p class="error">Đã xảy ra lỗi khi xử lý ghi âm. Vui lòng thử lại.</p>';
+            
+            let errorMsg = 'Đã xảy ra lỗi khi xử lý ghi âm. Vui lòng thử lại.';
+            if (error.message && error.message.includes('quota')) {
+                errorMsg = 'Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút.';
+            } else if (error.message && error.message.includes('timeout')) {
+                errorMsg = 'Quá trình xử lý mất quá nhiều thời gian. Vui lòng ghi âm ngắn hơn.';
+            } else if (error.message && error.message.includes('429')) {
+                errorMsg = 'Quá nhiều yêu cầu. Vui lòng đợi 1 phút rồi thử lại.';
+            }
+            
+            this.transcriptContent.innerHTML = `<p class="error">${errorMsg}</p>`;
             this.minutesContent.innerHTML = '<p class="error">Không thể tạo biên bản cuộc họp.</p>';
         }
     }

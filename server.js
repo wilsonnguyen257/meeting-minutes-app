@@ -7,21 +7,118 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
+
+// File upload configuration with validation
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 25 * 1024 * 1024, // 25MB max file size
+    },
+    fileFilter: function (req, file, cb) {
+        // Accept audio files only
+        const allowedMimes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/m4a'];
+        if (allowedMimes.includes(file.mimetype) || file.mimetype.startsWith('audio/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only audio files are allowed'), false);
+        }
+    }
+});
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' 
+        ? process.env.FRONTEND_URL || '*' 
+        : '*',
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static(__dirname));
+
+// Environment validation
+if (!process.env.GEMINI_API_KEY) {
+    console.error('ERROR: GEMINI_API_KEY environment variable is not set!');
+    process.exit(1);
+}
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Simple in-memory rate limiting (use Redis in production)
+const requestCounts = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10;
+
+function rateLimitMiddleware(req, res, next) {
+    const ip = req.ip || req.connection.remoteAddress;
+    const now = Date.now();
+    
+    if (!requestCounts.has(ip)) {
+        requestCounts.set(ip, []);
+    }
+    
+    const requests = requestCounts.get(ip).filter(time => now - time < RATE_LIMIT_WINDOW);
+    
+    if (requests.length >= MAX_REQUESTS_PER_WINDOW) {
+        return res.status(429).json({ 
+            error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.',
+            retryAfter: Math.ceil(RATE_LIMIT_WINDOW / 1000)
+        });
+    }
+    
+    requests.push(now);
+    requestCounts.set(ip, requests);
+    next();
+}
+
+// Clean up old rate limit entries periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, requests] of requestCounts.entries()) {
+        const validRequests = requests.filter(time => now - time < RATE_LIMIT_WINDOW);
+        if (validRequests.length === 0) {
+            requestCounts.delete(ip);
+        } else {
+            requestCounts.set(ip, validRequests);
+        }
+    }
+}, RATE_LIMIT_WINDOW);
+
 // Process audio endpoint
-app.post('/process-audio', upload.single('audio'), async (req, res) => {
+app.post('/process-audio', rateLimitMiddleware, upload.single('audio'), async (req, res) => {
+    const startTime = Date.now();
+    
+    // Set timeout for long-running requests
+    req.setTimeout(5 * 60 * 1000); // 5 minutes timeout
+    
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No audio file provided' });
+            return res.status(400).json({ 
+                error: 'Không tìm thấy file âm thanh',
+                message: 'Vui lòng chọn file âm thanh để tải lên'
+            });
+        }
+
+        // Validate file size
+        const fileSizeInMB = req.file.size / (1024 * 1024);
+        console.log(`Processing audio file: ${req.file.filename} (${fileSizeInMB.toFixed(2)} MB)`);
+
+        if (fileSizeInMB > 25) {
+            await fs.unlink(req.file.path);
+            return res.status(400).json({
+                error: 'File quá lớn',
+                message: 'Kích thước file không được vượt quá 25MB'
+            });
         }
 
         const audioPath = req.file.path;
@@ -43,16 +140,43 @@ app.post('/process-audio', upload.single('audio'), async (req, res) => {
         // Cleanup: delete uploaded file
         await fs.unlink(audioPath);
 
+        const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`Total processing time: ${processingTime}s`);
+
         res.json({
             transcript: transcript,
-            minutes: minutes
+            minutes: minutes,
+            metadata: {
+                processingTime: `${processingTime}s`,
+                fileSize: `${fileSizeInMB.toFixed(2)} MB`
+            }
         });
 
     } catch (error) {
         console.error('Error processing audio:', error);
+        
+        // Cleanup file if exists
+        if (req.file && req.file.path) {
+            try {
+                await fs.unlink(req.file.path);
+            } catch (unlinkError) {
+                console.error('Error cleaning up file:', unlinkError);
+            }
+        }
+        
+        // User-friendly error messages
+        let errorMessage = 'Đã xảy ra lỗi khi xử lý file âm thanh';
+        if (error.message.includes('quota')) {
+            errorMessage = 'Đã vượt quá giới hạn API. Vui lòng thử lại sau vài phút.';
+        } else if (error.message.includes('timeout')) {
+            errorMessage = 'Quá trình xử lý mất quá nhiều thời gian. Vui lòng thử file ngắn hơn.';
+        } else if (error.message.includes('Only audio files')) {
+            errorMessage = 'Chỉ chấp nhận file âm thanh.';
+        }
+        
         res.status(500).json({ 
-            error: 'Failed to process audio',
-            details: error.message 
+            error: errorMessage,
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });
