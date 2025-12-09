@@ -8,7 +8,7 @@ class MeetingRecorder {
         this.audioContext = null;
         this.analyser = null;
         this.visualizerAnimation = null;
-        this.maxRecordingTime = 30 * 60 * 1000; // 30 minutes max
+        this.maxRecordingTime = 120 * 60 * 1000; // 2 hours max (increased from 30 min)
         this.warningShown = false;
 
         this.initializeElements();
@@ -184,18 +184,18 @@ class MeetingRecorder {
         const seconds = (elapsed % 60).toString().padStart(2, '0');
         this.timer.textContent = `${minutes}:${seconds}`;
         
-        // Check if approaching max time (25 minutes)
+        // Check if approaching max time (1h50min for 2h limit)
         const elapsedMs = Date.now() - this.startTime;
-        if (elapsedMs > 25 * 60 * 1000 && !this.warningShown) {
+        if (elapsedMs > 110 * 60 * 1000 && !this.warningShown) {
             this.warningShown = true;
-            this.recordingStatus.textContent = '⚠️ Gần hết thời gian ghi âm! (còn 5 phút)';
+            this.recordingStatus.textContent = '⚠️ Gần hết thời gian ghi âm! (còn 10 phút)';
             this.recordingStatus.style.color = '#ff9800';
         }
         
         // Auto-stop at max time
         if (elapsedMs >= this.maxRecordingTime) {
             this.stopRecording();
-            alert('Đã đạt thời gian ghi âm tối đa (30 phút). Ghi âm đã dừng tự động.');
+            alert('Đã đạt thời gian ghi âm tối đa (2 giờ). Ghi âm đã dừng tự động.');
         }
     }
 
@@ -204,10 +204,19 @@ class MeetingRecorder {
         
         // Validate file size (25MB limit)
         const fileSizeInMB = audioBlob.size / (1024 * 1024);
+        
+        // Warning for very large files
+        if (fileSizeInMB > 20) {
+            const proceed = confirm(`File âm thanh rất lớn (${fileSizeInMB.toFixed(2)} MB). Quá trình xử lý có thể mất nhiều thời gian (5-10 phút). Bạn có muốn tiếp tục?`);
+            if (!proceed) {
+                return;
+            }
+        }
+        
         if (fileSizeInMB > 25) {
             this.hideLoading('transcript');
             this.hideLoading('minutes');
-            this.transcriptContent.innerHTML = '<p class="error">File âm thanh quá lớn (> 25MB). Vui lòng ghi âm ngắn hơn.</p>';
+            this.transcriptContent.innerHTML = '<p class="error">File âm thanh quá lớn (> 25MB). Vui lòng ghi âm ngắn hơn hoặc chia nhỏ cuộc họp.</p>';
             this.minutesContent.innerHTML = '<p class="error">Không thể xử lý file.</p>';
             return;
         }

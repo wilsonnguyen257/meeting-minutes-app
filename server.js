@@ -185,9 +185,15 @@ async function transcribeAudio(audioBase64, mimeType) {
     try {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         
+        // Check if audio is too large (> 20MB base64 = ~15MB file)
+        // For large files, we need to process differently
+        const sizeInMB = (audioBase64.length * 3) / (4 * 1024 * 1024);
+        console.log(`Audio size estimate: ${sizeInMB.toFixed(2)} MB`);
+        
         const prompt = `Transcribe this Vietnamese audio recording accurately. 
 Please provide the complete transcription of what was said in the meeting.
-Format the output as plain text with proper punctuation and paragraph breaks.`;
+Format the output as plain text with proper punctuation and paragraph breaks.
+If this is a long recording, provide a comprehensive transcription of all spoken content.`;
 
         const result = await model.generateContent([
             {
@@ -204,13 +210,24 @@ Format the output as plain text with proper punctuation and paragraph breaks.`;
 
     } catch (error) {
         console.error('Transcription error:', error);
+        
+        // If it's a quota or timeout error, provide better guidance
+        if (error.message && error.message.includes('quota')) {
+            throw new Error('API quota exceeded. For very long recordings (>1 hour), please split into shorter segments or try again later.');
+        }
+        
         throw new Error('Failed to transcribe audio: ' + error.message);
     }
 }
 
 async function generateMeetingMinutes(transcript) {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ 
+            model: 'gemini-2.5-flash',
+            generationConfig: {
+                maxOutputTokens: 8192, // Increase token limit for long meetings
+            }
+        });
         
         const prompt = `You are an expert meeting minutes generator. Analyze the following Vietnamese meeting transcript and create comprehensive meeting minutes.
 
@@ -228,6 +245,8 @@ Apply the 80/20 principle (Pareto Principle) to filter signal from noise:
   * Off-topic discussions
   * Unimportant clarifications
   * Filler words and tangential comments
+
+For long meetings (>1 hour), ensure you capture ALL major discussion points, decisions, and action items throughout the entire meeting.
 
 Create meeting minutes in Vietnamese with the following structure:
 1. Meeting title (brief, descriptive)
