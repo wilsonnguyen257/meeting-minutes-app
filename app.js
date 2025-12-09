@@ -8,6 +8,8 @@ class MeetingRecorder {
         this.audioContext = null;
         this.analyser = null;
         this.visualizerAnimation = null;
+        this.maxRecordingTime = 30 * 60 * 1000; // 30 minutes max
+        this.warningShown = false;
 
         this.initializeElements();
         this.attachEventListeners();
@@ -95,6 +97,7 @@ class MeetingRecorder {
 
             // Stop timer
             clearInterval(this.timerInterval);
+            this.warningShown = false;
 
             // Stop visualizer
             if (this.visualizerAnimation) {
@@ -107,7 +110,33 @@ class MeetingRecorder {
             const duration = Math.floor((Date.now() - this.startTime) / 1000);
             this.recordingStatus.textContent = `Đã ghi âm ${duration} giây`;
             this.recordingStatus.classList.remove('recording');
+            this.recordingStatus.style.color = '';
+            
+            // Create audio preview
+            this.createAudioPreview();
         }
+    }
+    
+    createAudioPreview() {
+        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        // Add audio player to UI
+        const previewHtml = `
+            <div class="audio-preview">
+                <p>🎧 Nghe lại bản ghi:</p>
+                <audio controls src="${audioUrl}"></audio>
+            </div>
+        `;
+        
+        // Insert before the results section
+        let existingPreview = document.querySelector('.audio-preview');
+        if (existingPreview) {
+            existingPreview.remove();
+        }
+        
+        const resultsSection = document.querySelector('.results-section');
+        resultsSection.insertAdjacentHTML('beforebegin', previewHtml);
     }
 
     setupVisualizer(stream) {
@@ -154,6 +183,20 @@ class MeetingRecorder {
         const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
         const seconds = (elapsed % 60).toString().padStart(2, '0');
         this.timer.textContent = `${minutes}:${seconds}`;
+        
+        // Check if approaching max time (25 minutes)
+        const elapsedMs = Date.now() - this.startTime;
+        if (elapsedMs > 25 * 60 * 1000 && !this.warningShown) {
+            this.warningShown = true;
+            this.recordingStatus.textContent = '⚠️ Gần hết thời gian ghi âm! (còn 5 phút)';
+            this.recordingStatus.style.color = '#ff9800';
+        }
+        
+        // Auto-stop at max time
+        if (elapsedMs >= this.maxRecordingTime) {
+            this.stopRecording();
+            alert('Đã đạt thời gian ghi âm tối đa (30 phút). Ghi âm đã dừng tự động.');
+        }
     }
 
     async processRecording() {
@@ -172,23 +215,43 @@ class MeetingRecorder {
         // Show loading states
         this.showLoading('transcript');
         this.showLoading('minutes');
+        
+        // Update loading text with progress
+        this.updateLoadingProgress('transcript', 'Đang tải lên file âm thanh...');
+        this.updateLoadingProgress('minutes', 'Đang chờ xử lý...');
 
         // Send to backend for processing
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.webm');
 
         try {
+            // Track upload progress
+            this.updateLoadingProgress('transcript', `Đang tải lên (${fileSizeInMB.toFixed(2)} MB)...`);
+            
             const response = await fetch('/process-audio', {
                 method: 'POST',
                 body: formData
             });
+            // Display results
+            this.hideLoading('transcript');
+            this.transcriptContent.innerHTML = `<div class="transcript-text">${this.formatTranscript(result.transcript)}</div>`;
 
-            if (!response.ok) {
-                throw new Error('Failed to process audio');
+            this.hideLoading('minutes');
+            this.minutesContent.innerHTML = this.formatMinutes(result.minutes);
+            
+            // Show metadata if available
+            if (result.metadata) {
+                const metaInfo = `<div class="meta-info">⏱️ Thời gian xử lý: ${result.metadata.processingTime} | 📁 Kích thước: ${result.metadata.fileSize}</div>`;
+                this.minutesContent.innerHTML += metaInfo;
             }
 
-            const result = await response.json();
+            // Show action buttons
+            document.querySelector('.actions').style.display = 'flex';
+            
+            // Save to localStorage for session persistence
+            this.saveToLocalStorage(result);
 
+        } catch (error) {
             // Display results
             this.hideLoading('transcript');
             this.transcriptContent.innerHTML = `<div class="transcript-text">${this.formatTranscript(result.transcript)}</div>`;
@@ -290,6 +353,52 @@ class MeetingRecorder {
         pane.querySelector('.loading').style.display = 'none';
         pane.querySelector('.content').style.display = 'block';
     }
+    
+    updateLoadingProgress(tab, message) {
+        const pane = document.getElementById(tab);
+        const loadingText = pane.querySelector('.loading p');
+        if (loadingText) {
+            loadingText.textContent = message;
+        }
+    }
+    
+    saveToLocalStorage(result) {
+        try {
+            const session = {
+                transcript: result.transcript,
+                minutes: result.minutes,
+                metadata: result.metadata,
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem('lastMeetingMinutes', JSON.stringify(session));
+        } catch (error) {
+            console.error('Failed to save to localStorage:', error);
+        }
+    }
+    
+    loadFromLocalStorage() {
+        try {
+            const saved = localStorage.getItem('lastMeetingMinutes');
+            if (saved) {
+                const session = JSON.parse(saved);
+                // Only load if less than 24 hours old
+                const age = Date.now() - new Date(session.timestamp).getTime();
+                if (age < 24 * 60 * 60 * 1000) {
+                    this.transcriptContent.innerHTML = `<div class="transcript-text">${this.formatTranscript(session.transcript)}</div>`;
+                    this.minutesContent.innerHTML = this.formatMinutes(session.minutes);
+                    if (session.metadata) {
+                        const metaInfo = `<div class="meta-info">⏱️ Thời gian xử lý: ${session.metadata.processingTime} | 📁 Kích thước: ${session.metadata.fileSize}</div>`;
+                        this.minutesContent.innerHTML += metaInfo;
+                    }
+                    document.querySelector('.actions').style.display = 'flex';
+                    return true;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load from localStorage:', error);
+        }
+        return false;
+    }
 
     switchTab(tabName) {
         // Update tab buttons
@@ -331,5 +440,10 @@ class MeetingRecorder {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new MeetingRecorder();
+    const app = new MeetingRecorder();
+    
+    // Try to load last session
+    if (app.loadFromLocalStorage()) {
+        console.log('Loaded previous session from localStorage');
+    }
 });
