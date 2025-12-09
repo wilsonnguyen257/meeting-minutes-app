@@ -1,0 +1,8 @@
+node_modules/
+uploads/*.webm
+uploads/*.wav
+uploads/*.mp3
+.env
+*.log
+.DS_Store
+.vercel

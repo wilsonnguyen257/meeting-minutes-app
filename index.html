@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biên Bản Cuộc Họp - Meeting Minutes</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 Biên Bản Cuộc Họp</h1>
+            <p>Ghi âm cuộc họp và tự động tạo biên bản bằng AI</p>
+        </header>
+
+        <main>
+            <section class="recording-section">
+                <div class="controls">
+                    <button id="startBtn" class="btn btn-primary">
+                        <span class="icon">🎤</span> Bắt đầu ghi âm
+                    </button>
+                    <button id="stopBtn" class="btn btn-danger" disabled>
+                        <span class="icon">⏹</span> Dừng ghi âm
+                    </button>
+                </div>
+
+                <div class="status">
+                    <div id="recordingStatus" class="status-text">Sẵn sàng</div>
+                    <div id="timer" class="timer">00:00</div>
+                </div>
+
+                <div class="audio-visualizer">
+                    <canvas id="visualizer"></canvas>
+                </div>
+            </section>
+
+            <section class="results-section">
+                <div class="tabs">
+                    <button class="tab active" data-tab="transcript">Bản ghi âm</button>
+                    <button class="tab" data-tab="minutes">Biên bản cuộc họp</button>
+                </div>
+
+                <div class="tab-content">
+                    <div id="transcript" class="tab-pane active">
+                        <div class="loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <p>Đang xử lý ghi âm...</p>
+                        </div>
+                        <div class="content" id="transcriptContent">
+                            <p class="placeholder">Bản ghi âm sẽ hiển thị ở đây sau khi xử lý...</p>
+                        </div>
+                    </div>
+
+                    <div id="minutes" class="tab-pane">
+                        <div class="loading" style="display: none;">
+                            <div class="spinner"></div>
+                            <p>Đang tạo biên bản cuộc họp...</p>
+                        </div>
+                        <div class="content" id="minutesContent">
+                            <p class="placeholder">Biên bản cuộc họp sẽ hiển thị ở đây...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions" style="display: none;">
+                    <button id="downloadBtn" class="btn btn-secondary">
+                        <span class="icon">💾</span> Tải xuống
+                    </button>
+                    <button id="copyBtn" class="btn btn-secondary">
+                        <span class="icon">📋</span> Sao chép
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Powered by Gemini 2.5 Flash • Signal/Noise Ratio: 80/20</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
